@@ -6,4 +6,4 @@ Requirements:
 - ImageMagick
 - xdotool
 
-Make sure project is executed from repository root so that assets are loaded correctly.
+This project expects `$AUTO_MINESWEEPER_HOME` to be set to the repository root to work properly.
