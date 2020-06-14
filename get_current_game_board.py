@@ -108,9 +108,12 @@ if __name__ == '__main__':
     tiles = screenshot_to_tiles(get_screenshot(info), info)
     cols, rows = info.tiles_shape
     tile_count = cols * rows
+
     unrecognized_tiles = []
-    print(f"{rows} {cols}")
+    output_tmp = []
+
     for row in tiles:
+        cur_row = []
         for tile in row:
             r = tile_matcher.match(tile)
             if r is None:
@@ -118,8 +121,8 @@ if __name__ == '__main__':
                 ch = 'E'
             else:
                 ch = tag_to_char(r)
-            print(ch, end='')
-        print()
+            cur_row.append(ch)
+        output_tmp.append(''.join(cur_row))
     if unrecognized_tiles:
         # If there are too many unmatched files, chances are we are looking at
         # some screenshot totally unrelated. In those cases it's better not to store anything.
@@ -128,6 +131,12 @@ if __name__ == '__main__':
         for t in unrecognized_tiles:
             tile_matcher.write_new_untagged(t)
         print(f"{len(unrecognized_tiles)} untagged tiles added to assets.")
+
+    print(f"{rows} {cols}")
+    for o in output_tmp:
+        print(o)
+
+    if unrecognized_tiles:
         # This type of exception can be resolved by tagging manually.
         # Therefore we explicitly set exit code to 20 so that caller program can
         # return error messages correspondingly.
