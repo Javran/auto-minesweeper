@@ -4,8 +4,11 @@
 
 import collections
 import json
+import os
+import re
 import subprocess
 import sys
+import uuid
 
 import cv2
 import numpy
@@ -15,6 +18,48 @@ Info = collections.namedtuple(
     'Info',
     ['window_id', 'top_left', 'tiles_shape',
      'tile_size', 'tile_shrink'])
+
+class TileMatcher:
+    """Matches tiles with a set of known and tagged tile samples.
+    """
+
+    @staticmethod
+    def load_tagged_samples(asset_path):
+        samples = collections.defaultdict(list)
+        re_tag = re.compile(r'^([0-9A-Za-z]+)_.*\.png$')
+        for file_name in os.listdir(asset_path):
+            match_result = re_tag.match(file_name)
+            if match_result:
+                tag = match_result.group(1)
+                if tag != 'untagged':
+                    img = cv2.imread(os.path.join(asset_path, file_name),
+                                     cv2.IMREAD_COLOR)
+                    samples[tag].append(img)
+        return samples
+
+    def __init__(self, asset_path):
+        self.threshold = 0.999995
+        self.asset_path = asset_path
+        # key: tag, value: list of samples (images)
+        self.tagged_samples = TileMatcher.load_tagged_samples(asset_path)
+
+    def write_new_untagged(self, img):
+        nonce = str(uuid.uuid4())
+        file_path = os.path.join(self.asset_path, f"untagged_{nonce}.png")
+        cv2.imwrite(file_path, img, [cv2.IMWRITE_PNG_COMPRESSION])
+
+    def match(self, img):
+        best = None # (tag, val)
+        for tag, samples in self.tagged_samples.items():
+            for s in samples:
+                [[res]] = cv2.matchTemplate(img, s, cv2.TM_CCORR_NORMED)
+                if res >= self.threshold and (best is None or best[1] < res):
+                    best = (tag, res)
+        if best is None:
+            return None
+        return best[0]
+
+tile_matcher = TileMatcher('assets/tagged')
 
 def get_screenshot(info):
     x, y = info.top_left
@@ -42,6 +87,15 @@ def screenshot_to_tiles(img, info):
     return [[crop(r,c) for c in range(cols)] for r in range(rows)]
 
 
+def tag_to_char(tag):
+    if tag == 'unknown':
+        return '?'
+    elif tag == 'no':
+        return ' '
+    else:
+        return tag
+
+
 if __name__ == '__main__':
     # This takes the output from find_window.py
     # info are valid as long as the browser tab
@@ -49,6 +103,25 @@ if __name__ == '__main__':
     [_, info_raw] = sys.argv
     info = json.loads(info_raw, object_hook=lambda d: Info(**d))
     tiles = screenshot_to_tiles(get_screenshot(info), info)
-    cv2.imshow('', cv2.vconcat([ cv2.hconcat(row) for row in tiles ]))
-    cv2.waitKey(0)
-    cv2.waitKey(0)
+    cols, rows = info.tiles_shape
+    tile_count = cols * rows
+    unrecognized_tiles = []
+    print(f"{rows} {cols}")
+    for row in tiles:
+        for tile in row:
+            r = tile_matcher.match(tile)
+            if r is None:
+                unrecognized_tiles.append(tile)
+                ch = 'E'
+            else:
+                ch = tag_to_char(r)
+            print(ch, end='')
+        print()
+    if unrecognized_tiles:
+        if len(unrecognized_tiles) / tile_count > 0.9:
+            print('Too many unrecognized tiles.')
+        else:
+            for t in unrecognized_tiles:
+                tile_matcher.write_new_untagged(t)
+            print(f"{len(unrecognized_tiles)} untagged tiles added to assets.")
+        sys.exit(1)
