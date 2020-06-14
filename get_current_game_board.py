@@ -20,6 +20,11 @@ Info = collections.namedtuple(
      'tile_size', 'tile_shrink'])
 
 
+# Tagged patterns are small png files that has the same shape (width and height) as
+# tiles with a filename indicating which tag it belongs to.
+# Without being too pedentic, a png file "XXX_somestuff.png" is a pattern with tag "XXX"
+# and "somestuff" is ignored. In addition "untagged" is meant to be manually tagged
+# therefore it is ignored when importing patterns.
 class TileMatcher:
     """Matches tiles with a set of known and tagged tile samples.
     """
@@ -90,15 +95,6 @@ def screenshot_to_tiles(img, info):
     return [[crop(r,c) for c in range(cols)] for r in range(rows)]
 
 
-def tag_to_char(tag):
-    if tag == 'unknown':
-        return '?'
-    elif tag == 'no':
-        return ' '
-    else:
-        return tag
-
-
 if __name__ == '__main__':
     # This takes the output from find_window.py
     # info are valid as long as the browser tab
@@ -108,6 +104,14 @@ if __name__ == '__main__':
     tiles = screenshot_to_tiles(get_screenshot(info), info)
     cols, rows = info.tiles_shape
     tile_count = cols * rows
+
+    def tag_to_char(tag):
+        if tag == 'unknown':
+            return '?'
+        elif tag == 'no':
+            return ' '
+        else:
+            return tag
 
     unrecognized_tiles = []
     output_tmp = []
