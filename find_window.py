@@ -2,13 +2,16 @@
 """Finds a window that has minesweeper opened.
 """
 
+import json
 import re
 import subprocess
 
 import cv2
 import numpy
 
-RE_XWININFO_WIN_ID_EXTRACT = re.compile(r'^xwininfo: Window id: (\d+) ', re.MULTILINE)
+
+RE_XWININFO_WIN_ID_EXTRACT = re.compile(r'^xwininfo: Window id: (\d+) ',
+                                        re.MULTILINE)
 PAT_HARD = cv2.imread('assets/hard.jpg',cv2.IMREAD_COLOR)
 
 
@@ -38,10 +41,24 @@ def recognize_minesweeper(window_id, img_filter=lambda x: x):
     print(max_val)
     assert max_val >= 0.994, 'Cannot find minesweeper in the selected window.'
     pat_x, pat_y = max_loc
-    # TODO: make this more customization by attaching some metadata to the pattern asset.
+    # TODO: make this more customization by attaching some metadata
+    # to the pattern asset.
     return (pat_x - 12, pat_y + 49)
 
 
 if __name__ == '__main__':
     window_id = find_window_id()
-    recognize_minesweeper(window_id)
+    top_left = recognize_minesweeper(window_id)
+    print(json.dumps(
+        {
+            'window_id': window_id,
+            'top_left': top_left,
+            # columns and rows
+            'tiles_shape': (24,20),
+            # size of each tile
+            'tile_size': (25,25),
+            # shrink tile size (for template matching)
+            'tile_shrink': 3,
+        },
+        separators=(',', ':')))
+
