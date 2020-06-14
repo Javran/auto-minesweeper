@@ -19,6 +19,7 @@ Info = collections.namedtuple(
     ['window_id', 'top_left', 'tiles_shape',
      'tile_size', 'tile_shrink'])
 
+
 class TileMatcher:
     """Matches tiles with a set of known and tagged tile samples.
     """
@@ -59,7 +60,9 @@ class TileMatcher:
             return None
         return best[0]
 
+
 tile_matcher = TileMatcher('assets/tagged')
+
 
 def get_screenshot(info):
     x, y = info.top_left
@@ -118,10 +121,14 @@ if __name__ == '__main__':
             print(ch, end='')
         print()
     if unrecognized_tiles:
-        if len(unrecognized_tiles) / tile_count > 0.9:
-            print('Too many unrecognized tiles.')
-        else:
-            for t in unrecognized_tiles:
-                tile_matcher.write_new_untagged(t)
-            print(f"{len(unrecognized_tiles)} untagged tiles added to assets.")
-        sys.exit(1)
+        # If there are too many unmatched files, chances are we are looking at
+        # some screenshot totally unrelated. In those cases it's better not to store anything.
+        assert len(unrecognized_tiles) / tile_count < 0.9, 'Too many unrecognized tiles.'
+        # Unrecognized tiles needs to be stored and manually tagged.
+        for t in unrecognized_tiles:
+            tile_matcher.write_new_untagged(t)
+        print(f"{len(unrecognized_tiles)} untagged tiles added to assets.")
+        # This type of exception can be resolved by tagging manually.
+        # Therefore we explicitly set exit code to 20 so that caller program can
+        # return error messages correspondingly.
+        sys.exit(20)
