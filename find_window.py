@@ -1,9 +1,11 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.7
 """Finds a window that has minesweeper opened.
 """
 
 import re
 import subprocess
+
+import cv2
 
 
 RE_XWININFO_WIN_ID_EXTRACT = re.compile(r'^xwininfo: Window id: (\d+) ', re.MULTILINE)
