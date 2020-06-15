@@ -17,7 +17,11 @@ import numpy
 Info = collections.namedtuple(
     'Info',
     ['window_id', 'top_left', 'tiles_shape',
-     'tile_size', 'tile_shrink'])
+     'tile_size', 'tile_shrink',
+     # find_window.py won't have this 'tagging',
+     # used for indicating that we actually want to store the sample.
+     'tagging'
+    ])
 
 
 # Tagged patterns are small png files that has the same shape (width and height) as
@@ -100,7 +104,13 @@ if __name__ == '__main__':
     # info are valid as long as the browser tab
     # in question is still opened.
     [_, info_raw] = sys.argv
-    info = json.loads(info_raw, object_hook=lambda d: Info(**d))
+    def obj_hook(d):
+        if not 'tagging' in d:
+            d['tagging'] = False
+        else:
+            d['tagging'] = bool(d['tagging'])
+        return Info(**d)
+    info = json.loads(info_raw, object_hook=obj_hook)
     tiles = screenshot_to_tiles(get_screenshot(info), info)
     cols, rows = info.tiles_shape
     tile_count = cols * rows
@@ -132,9 +142,12 @@ if __name__ == '__main__':
         # some screenshot totally unrelated. In those cases it's better not to store anything.
         assert len(unrecognized_tiles) / tile_count < 0.9, 'Too many unrecognized tiles.'
         # Unrecognized tiles needs to be stored and manually tagged.
-        for t in unrecognized_tiles:
-            tile_matcher.write_new_untagged(t)
-        print(f"{len(unrecognized_tiles)} untagged tiles added to assets.")
+        if info.tagging:
+            for t in unrecognized_tiles:
+                tile_matcher.write_new_untagged(t)
+            print(f"{len(unrecognized_tiles)} untagged tiles added to assets.")
+        else:
+            print(f"{len(unrecognized_tiles)} untagged tiles found but not stored.")
 
     print(f"{rows} {cols}")
     for o in output_tmp:
