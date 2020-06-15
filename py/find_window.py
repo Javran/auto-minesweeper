@@ -5,6 +5,7 @@
 import json
 import re
 import subprocess
+import sys
 
 import cv2
 import numpy
@@ -21,7 +22,8 @@ def canny(img):
 
 def find_window_id():
     """Finds window id."""
-    print('Left click to select a window that has minesweeper running ...')
+    print('Left click to select a window that has minesweeper running ...',
+          file=sys.stderr)
     result = subprocess.run(['xwininfo', '-int'],
                             stdout=subprocess.PIPE, check=True, encoding='utf8')
     return int(RE_XWININFO_WIN_ID_EXTRACT.search(result.stdout).group(1))
@@ -38,7 +40,6 @@ def recognize_minesweeper(window_id, img_filter=lambda x: x):
     img, pat = img_filter(screenshot), img_filter(PAT_HARD)
     res = cv2.matchTemplate(img, pat, cv2.TM_CCORR_NORMED)
     _, max_val, _, max_loc = cv2.minMaxLoc(res)
-    print(max_val)
     assert max_val >= 0.994, 'Cannot find minesweeper in the selected window.'
     pat_x, pat_y = max_loc
     # TODO: make this more customization by attaching some metadata
