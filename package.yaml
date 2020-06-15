@@ -10,6 +10,16 @@ description: description
 
 dependencies:
 - base
+- aeson
+- process
+- vector
+- bytestring
+- vector
+- filepath
+- text
+- safe-exceptions
+- minesweeper-solver
+- containers
 
 executables:
   demo:

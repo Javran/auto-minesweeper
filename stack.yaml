@@ -1,3 +1,9 @@
 resolver: lts-15.12
 packages:
 - .
+
+extra-deps:
+- git: https://github.com/Javran/puzzle-solving-collection.git
+  commit: 4def9d333b91cdd483fafa3518e4f35d88dd7f38
+  subdirs:
+    - minesweeper-solver
