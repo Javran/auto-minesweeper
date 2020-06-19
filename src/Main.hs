@@ -15,8 +15,10 @@ import Data.Function
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8)
-import Game.Minesweeper.Main hiding (main)
+import Game.Minesweeper.Main (pprBoard)
 import Game.Minesweeper.Parser
+import Game.Minesweeper.Solver
+import Game.Minesweeper.Types
 import Info
 import System.Environment
 import System.Exit
@@ -105,7 +107,7 @@ solverLoop
     fix $ \loop -> do
       rKeepGoing <- tryAny $ do
         boardRaw <- getCurrentGameBoard pyHome infoRaw
-        tmpBd <- pure (parseBoard boardRaw)
+        Just tmpBd <- pure (parseBoard boardRaw)
         case mkBoard tmpBd of
           Nothing -> do
             putStrLn "Failed to create the board, exiting..."
