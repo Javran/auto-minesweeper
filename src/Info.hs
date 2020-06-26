@@ -7,11 +7,11 @@ import Data.Aeson
 import qualified Data.Vector as V
 
 data Info = Info
-  { windowId :: Int,
-    topLeft :: (Int, Int),
-    tilesShape :: (Int, Int),
-    tileSize :: (Int, Int),
-    tileShrink :: Int
+  { windowId :: Int
+  , topLeft :: (Int, Int)
+  , tilesShape :: (Int, Int)
+  , tileSize :: (Int, Int)
+  , tileShrink :: Int
   }
   deriving (Show)
 
