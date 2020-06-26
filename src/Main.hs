@@ -2,13 +2,12 @@
 {-# LANGUAGE NumericUnderscores #-}
 
 module Main
-  ( main,
+  ( main
   )
 where
 
 import Control.Applicative
 import Control.Concurrent
-import qualified Data.Set as S
 import Control.Concurrent.Async
 import Control.Exception.Safe
 import Control.Monad
@@ -18,12 +17,13 @@ import Data.Function
 import Data.List
 import qualified Data.Map.Strict as M
 import Data.Maybe
+import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8)
 import Data.Time.Clock
 import Game.Minesweeper.BoardRep
-import Game.Minesweeper.Pretty
 import Game.Minesweeper.Parser
+import Game.Minesweeper.Pretty
 import Game.Minesweeper.Solver
 import Game.Minesweeper.Types
 import Info
@@ -48,8 +48,8 @@ getWindowInfo :: FilePath -> IO (T.Text, Info)
 getWindowInfo pyHome = do
   let cp =
         (proc (pyHome </> "find_window.py") [])
-          { std_out = CreatePipe,
-            cwd = Just pyHome
+          { std_out = CreatePipe
+          , cwd = Just pyHome
           }
   (_, Just hOut, _, ph) <- createProcess cp
   raw <- BS.hGetContents hOut
@@ -65,8 +65,8 @@ getCurrentGameBoard :: FilePath -> T.Text -> IO String
 getCurrentGameBoard pyHome infoRaw = do
   let cp =
         (proc (pyHome </> "get_current_game_board.py") [T.unpack infoRaw])
-          { std_out = CreatePipe,
-            cwd = Just pyHome
+          { std_out = CreatePipe
+          , cwd = Just pyHome
           }
   (_, Just hOut, _, ph) <- createProcess cp
   raw <- hGetContents hOut
@@ -81,30 +81,27 @@ getCurrentGameBoard pyHome infoRaw = do
 gameBoardCaptureThread :: FilePath -> T.Text -> Chan (UTCTime, BoardRep) -> IO ()
 gameBoardCaptureThread pyHome infoRaw chanBd =
   fix
-    ( \loop mBoardRep -> do
-        r <- tryIO (getCurrentGameBoard pyHome infoRaw)
-        case r of
-          Right raw ->
-            case parseBoard raw of
-              Just brNew -> do
-                t <- getCurrentTime
-                let br' =
-                      fromJust
-                        ( ( do
-                              brCur <- mBoardRep
-                              mergeBoardRep brNew brCur
-                          )
-                            <|> Just brNew
-                        )
-                print (isPartial br')
-                unless (isPartial br') $ do
-                  writeChan chanBd (t, br')
-                delay >> loop (Just br')
-              Nothing ->
-                delay >> loop mBoardRep
-          _ ->
-            delay >> loop mBoardRep
-    )
+    (\loop mBoardRep -> do
+       r <- tryIO (getCurrentGameBoard pyHome infoRaw)
+       case r of
+         Right raw ->
+           case parseBoard raw of
+             Just brNew -> do
+               t <- getCurrentTime
+               let br' =
+                     fromJust
+                       ((do
+                           brCur <- mBoardRep
+                           mergeBoardRep brNew brCur)
+                          <|> Just brNew)
+               print (isPartial br')
+               unless (isPartial br') $ do
+                 writeChan chanBd (t, br')
+               delay >> loop (Just br')
+             Nothing ->
+               delay >> loop mBoardRep
+         _ ->
+           delay >> loop mBoardRep)
     Nothing
   where
     delay = pure ()
@@ -130,21 +127,20 @@ clickerThread :: Info -> MVar (UTCTime, [Coord]) -> IO ()
 clickerThread info mMoves = do
   tInit <- getCurrentTime
   fix
-    ( \loop tRef moves clickCache -> do
-        (tNew, movesNew) <- readMVar mMoves
-        let (tRef', moves') =
-              if tNew > tRef
-                then
-                  let cNewMoves = filter (`notElem` clickCache) movesNew
+    (\loop tRef moves clickCache -> do
+       (tNew, movesNew) <- readMVar mMoves
+       let (tRef', moves') =
+             if tNew > tRef
+               then
+                 let cNewMoves = filter (`notElem` clickCache) movesNew
                   in (tNew, cNewMoves)
-                else (tRef, moves)
-        case moves' of
-          [] ->
-            threadDelay 10_000 >> loop tRef' moves' clickCache
-          x : xs -> do
-            executeStep info x
-            loop tRef' xs (take 50 (x : clickCache))
-    )
+               else (tRef, moves)
+       case moves' of
+         [] ->
+           threadDelay 10_000 >> loop tRef' moves' clickCache
+         x : xs -> do
+           executeStep info x
+           loop tRef' xs (take 50 (x : clickCache)))
     tInit
     []
     []
@@ -162,9 +158,9 @@ moveMouseToGlobalLocation (x, y) =
 executeStep :: Info -> Coord -> IO ()
 executeStep
   Info
-    { topLeft = (xBase, yBase),
-      tileSize = (tileWidth, tileHeight),
-      windowId
+    { topLeft = (xBase, yBase)
+    , tileSize = (tileWidth, tileHeight)
+    , windowId
     }
   (tileR, tileC) = do
     let x = xBase + tileWidth * tileC + quot tileWidth 2
@@ -194,15 +190,14 @@ solverLoop
               pprBoard term False bdFin
               let solvingSteps =
                     concatMap
-                      ( \(k@(r, c), v) ->
-                          [ k
-                            | not v,
-                              r >= 0,
-                              r < rows,
-                              c >= 0,
-                              c < cols
-                          ]
-                      )
+                      (\(k@(r, c), v) ->
+                         [ k
+                         | not v
+                         , r >= 0
+                         , r < rows
+                         , c >= 0
+                         , c < cols
+                         ])
                       . M.toList
                       $ M.difference (bdMines bdFin) (bdMines bd)
               loc <- getMouseGlobalLocation
