@@ -140,7 +140,7 @@ if __name__ == '__main__':
     if unrecognized_tiles:
         # If there are too many unmatched files, chances are we are looking at
         # some screenshot totally unrelated. In those cases it's better not to store anything.
-        assert len(unrecognized_tiles) / tile_count < 0.9, 'Too many unrecognized tiles.'
+        assert len(unrecognized_tiles) != tile_count, 'Too many unrecognized tiles.'
         # Unrecognized tiles needs to be stored and manually tagged.
         if info.tagging:
             for t in unrecognized_tiles:
