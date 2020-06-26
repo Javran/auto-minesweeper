@@ -6,20 +6,28 @@ module Main
   )
 where
 
+import Control.Applicative
 import Control.Concurrent
+import qualified Data.Set as S
+import Control.Concurrent.Async
 import Control.Exception.Safe
 import Control.Monad
 import Data.Aeson
 import qualified Data.ByteString as BS
 import Data.Function
+import Data.List
 import qualified Data.Map.Strict as M
+import Data.Maybe
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8)
-import Game.Minesweeper.Main (pprBoard)
+import Data.Time.Clock
+import Game.Minesweeper.BoardRep
+import Game.Minesweeper.Pretty
 import Game.Minesweeper.Parser
 import Game.Minesweeper.Solver
 import Game.Minesweeper.Types
 import Info
+import System.Console.Terminfo
 import System.Environment
 import System.Exit
 import System.FilePath.Posix
@@ -65,12 +73,81 @@ getCurrentGameBoard pyHome infoRaw = do
   ec <- waitForProcess ph
   case ec of
     ExitSuccess -> pure raw
-    ExitFailure 20 -> do
-      putStrLn "Some tagging required."
-      exitFailure
+    ExitFailure 20 -> pure raw
     _ -> do
       putStrLn $ "Process failed: " <> show ec
-      exitFailure
+      pure ""
+
+gameBoardCaptureThread :: FilePath -> T.Text -> Chan (UTCTime, BoardRep) -> IO ()
+gameBoardCaptureThread pyHome infoRaw chanBd =
+  fix
+    ( \loop mBoardRep -> do
+        r <- tryIO (getCurrentGameBoard pyHome infoRaw)
+        case r of
+          Right raw ->
+            case parseBoard raw of
+              Just brNew -> do
+                t <- getCurrentTime
+                let br' =
+                      fromJust
+                        ( ( do
+                              brCur <- mBoardRep
+                              mergeBoardRep brNew brCur
+                          )
+                            <|> Just brNew
+                        )
+                print (isPartial br')
+                unless (isPartial br') $ do
+                  writeChan chanBd (t, br')
+                delay >> loop (Just br')
+              Nothing ->
+                delay >> loop mBoardRep
+          _ ->
+            delay >> loop mBoardRep
+    )
+    Nothing
+  where
+    delay = pure ()
+
+solverThread :: Terminal -> Chan (UTCTime, BoardRep) -> MVar (UTCTime, [Coord]) -> IO ()
+solverThread term chanBd mMoves = fix $ \loop -> do
+  (t, br) <- readChan chanBd
+  case mkBoard br of
+    Nothing -> loop
+    Just (xs, bd) ->
+      case solveBoard bd xs of
+        Just bdFin -> do
+          pprBoard term False bdFin
+          let solvingSteps =
+                concatMap (\(k, v) -> [k | not v])
+                  . M.toList
+                  $ M.difference (bdMines bdFin) (bdMines bd)
+          _ <- swapMVar mMoves (t, solvingSteps)
+          loop
+        Nothing -> loop
+
+clickerThread :: Info -> MVar (UTCTime, [Coord]) -> IO ()
+clickerThread info mMoves = do
+  tInit <- getCurrentTime
+  fix
+    ( \loop tRef moves clickCache -> do
+        (tNew, movesNew) <- readMVar mMoves
+        let (tRef', moves') =
+              if tNew > tRef
+                then
+                  let cNewMoves = filter (`notElem` clickCache) movesNew
+                  in (tNew, cNewMoves)
+                else (tRef, moves)
+        case moves' of
+          [] ->
+            threadDelay 10_000 >> loop tRef' moves' clickCache
+          x : xs -> do
+            executeStep info x
+            loop tRef' xs (take 50 (x : clickCache))
+    )
+    tInit
+    []
+    []
 
 getMouseGlobalLocation :: IO (Int, Int)
 getMouseGlobalLocation = do
@@ -92,15 +169,15 @@ executeStep
   (tileR, tileC) = do
     let x = xBase + tileWidth * tileC + quot tileWidth 2
         y = yBase + tileHeight * tileR + quot tileHeight 2
-    print (tileR, tileC)
     callProcess "xdotool" ["mousemove", "--window", show windowId, show x, show y]
     callProcess "xdotool" ["click", "--window", show windowId, "1"]
     -- move to somewhere not in the board
     -- otherwise the hover style can interfere a bit.
     callProcess "xdotool" ["mousemove", "--window", show windowId, "100", "100"]
 
-solverLoop :: FilePath -> T.Text -> Info -> IO ()
+solverLoop :: Terminal -> FilePath -> T.Text -> Info -> IO ()
 solverLoop
+  term
   pyHome
   infoRaw
   info@Info {tilesShape = (cols, rows)} =
@@ -114,7 +191,7 @@ solverLoop
             pure False
           Just (xs, bd) -> case solveBoard bd xs of
             Just bdFin -> do
-              pprBoard bdFin
+              pprBoard term False bdFin
               let solvingSteps =
                     concatMap
                       ( \(k@(r, c), v) ->
@@ -145,7 +222,16 @@ solverLoop
 
 main :: IO ()
 main = do
+  term <- setupTermFromEnv
   prjHome <- getProjectHome
   let pyHome = prjHome </> "py"
   (infoRaw, info) <- getWindowInfo pyHome
-  solverLoop pyHome infoRaw info
+  tInit <- getCurrentTime
+  chanBd <- newChan
+  mMoves <- newMVar (tInit, [])
+  hGameBoard <- async (gameBoardCaptureThread pyHome infoRaw chanBd)
+  hSolver <- async (solverThread term chanBd mMoves)
+  hClicker <- async (clickerThread info mMoves)
+  wait hClicker
+  wait hGameBoard
+  wait hSolver

@@ -20,6 +20,9 @@ dependencies:
 - safe-exceptions
 - minesweeper-solver
 - containers
+- terminfo
+- time
+- async
 
 executables:
   demo:

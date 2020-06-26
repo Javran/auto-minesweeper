@@ -4,6 +4,6 @@ packages:
 
 extra-deps:
 - git: https://github.com/Javran/puzzle-solving-collection.git
-  commit: 908d85ffd404f33c933d5fd872b0bad96ff9f637
+  commit: fd4c4ea452fc33d88432d0a1ac7581bc477fabb3
   subdirs:
     - minesweeper-solver
