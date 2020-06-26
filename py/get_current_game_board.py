@@ -145,9 +145,9 @@ if __name__ == '__main__':
         if info.tagging:
             for t in unrecognized_tiles:
                 tile_matcher.write_new_untagged(t)
-            print(f"{len(unrecognized_tiles)} untagged tiles added to assets.")
+            print(f"{len(unrecognized_tiles)} untagged tiles added to assets.", file=sys.stderr)
         else:
-            print(f"{len(unrecognized_tiles)} untagged tiles found but not stored.")
+            print(f"{len(unrecognized_tiles)} untagged tiles found but not stored.", file=sys.stderr)
 
     print(f"{rows} {cols}")
     for o in output_tmp:
